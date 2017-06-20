@@ -2,17 +2,15 @@
 set -e
 echo "Deploying dynamo-firehose stack"
 
-# Create Template
-#python create_cloudformation_template.py
-
-
 # deploy the newly created CF template
-TEMPLATE_NAME='DynamoToFirehoseLambda-cf.yaml'
-STACK_NAME="dynamo-to-firehose-lambda"
+TEMPLATE_NAME='DynamoFirehoseToS3-cf.yaml'
+TABLE_NAME='rhystest2'
+STACK_NAME="$TABLE_NAME-dynamo-firehose-to-s3-cfs"
 echo "StackName: $STACK_NAME"
 aws cloudformation create-stack \
     --stack-name $STACK_NAME \
     --template-body file://$TEMPLATE_NAME \
+    --parameters ParameterKey=TableName,ParameterValue=$TABLE_NAME \
     --capabilities CAPABILITY_NAMED_IAM \
     --profile vgwcorpdev \
     --region us-east-1 \

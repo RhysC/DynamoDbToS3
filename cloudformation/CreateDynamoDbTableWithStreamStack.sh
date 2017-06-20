@@ -7,11 +7,13 @@ echo "Deploying dynamo-table-with-stream stack"
 
 # deploy the newly created CF template
 TEMPLATE_NAME='DynamoDb-cf.yaml'
-STACK_NAME="dynamo-table-with-stream"
+TABLE_NAME='rhystest2'
+STACK_NAME="$TABLE_NAME-dynamo-table-with-stream"
 echo "StackName: $STACK_NAME"
 aws cloudformation create-stack \
     --stack-name $STACK_NAME \
     --template-body file://$TEMPLATE_NAME \
+    --parameters ParameterKey=TableName,ParameterValue=$TABLE_NAME \
     --capabilities CAPABILITY_NAMED_IAM \
     --profile vgwcorpdev \
     --region us-east-1 \
@@ -22,12 +24,6 @@ aws cloudformation wait stack-create-complete \
     --profile vgwcorpdev \
     --region us-east-1
 
-echo "TableName:"
-aws cloudformation describe-stacks \
-    --stack-name $STACK_NAME \
-    --profile vgwcorpdev \
-    --region us-east-1 \
-    --query 'Stacks[0].Outputs[?OutputKey==`TableName`].OutputValue'
-
+echo "TableName:$TABLE_NAME"
 
 echo "Complete"

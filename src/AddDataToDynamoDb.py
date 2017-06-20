@@ -1,4 +1,5 @@
 import time
+import datetime
 from decimal import Decimal
 import boto3
 from faker import Factory
@@ -11,6 +12,7 @@ fake = Factory.create()
 
 def load_data(table):
     for outer_loop in range(0, 100):
+        print("Batch: {} - {}".format(outer_loop, datetime.datetime.now()))
         with table.batch_writer() as batch:
             for inner_loop in range(0, 25):  # max 25 items per batch write
                 record = {
@@ -34,6 +36,7 @@ def load_data(table):
 
 
 if __name__ == "__main__":
-    table_name = 'sampleData'
+    table_name = 'rhystest2'
     table = dynamodb.Table(table_name)
     load_data(table)
+    print("records loaded.")
