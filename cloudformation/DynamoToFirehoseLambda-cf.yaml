@@ -1,0 +1,123 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Parameters:
+  FeaturePrefix:
+      Description: "The name to be used to prefix resources"
+      Type: String
+      Default: rhystest
+
+Resources:
+
+  LambdaToFirehoseRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: !Join
+        - ""
+        -
+          - Ref: FeaturePrefix
+          - "LambdaToFirehoseRole"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+            Action: "sts:AssumeRole"
+      Policies:
+        -
+          PolicyName: !Join
+            - ""
+            -
+              - Ref: FeaturePrefix
+              - "LambdaToFirehosePolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Effect: "Allow"
+                Action:
+                  - "dynamodb:GetRecords"
+                  - "dynamodb:GetShardIterator"
+                  - "dynamodb:DescribeStream"
+                  - "dynamodb:ListStreams"
+                Resource:
+                  Fn::ImportValue:
+                    !Sub "${FeaturePrefix}-dynamodb-stream-arn"
+              -
+                Effect: "Allow"
+                Action:
+                  - "firehose:PutRecord"
+                  - "firehose:PutRecordBatch"
+                Resource:
+                  Fn::ImportValue:
+                    !Sub "${FeaturePrefix}-event-kinesis-firehose-arn"
+              -
+                Effect: "Allow"
+                Action:
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource: "*"
+              -
+                Effect: "Allow"
+                Action:
+                  - "xray:PutTraceSegments"
+                  - "xray:PutTelemetryRecords"
+                Resource: "*"
+
+  DynamoEventsToFirehoseLambda:
+    Type: "AWS::Lambda::Function"
+    Properties:
+      FunctionName: !Join ["",[Ref: FeaturePrefix, "DynamoToFirehoseLambda"]]
+      Handler: "index.handler"
+      Role: !GetAtt ["LambdaToFirehoseRole", "Arn"]
+      Code:
+        ZipFile:
+          Fn::Join:
+            - "\n"
+            - - ""
+              - "'use strict';"
+              - "var AWS = require('aws-sdk');"
+              - ""
+              - "console.log('Loading function');"
+              - ""
+              - "var firehose = new AWS.Firehose({"
+              - "    apiVersion: '2015-08-04',"
+              - "});"
+              - ""
+              - "exports.handler = (event, context, callback) => {"
+              - "    let json_records = event.Records.map(function(rec) { return JSON.stringify(rec['dynamodb']); });"
+              - "    let mapped_records = json_records.map(function(rec){ return {'Data': rec }; });"
+              - "    console.log('Records to be sent: ' + json_records.join('\\n'));"
+              - ""
+              - "    let params = {"
+              - !Sub "      DeliveryStreamName: '${FeaturePrefix}-firehose',"
+              - "      Records: mapped_records"
+              - "    };"
+              - "    firehose.putRecordBatch(params, function(err, data) {"
+              - "      if (err) {"
+              - "        console.log(err, err.stack); // an error occurred"
+              - "      }"
+              - "      else{"
+              - "        console.log(data);           // successful response"
+              - "      }"
+              - "    });"
+              - "    callback(null, 'Successfully processed ${event.Records.length} records.');"
+              - "};"
+      Runtime: "nodejs4.3"
+      Timeout: "25"
+
+  DynamoEventsToFirehoseLambdaEventSourceMapping:
+    Type: "AWS::Lambda::EventSourceMapping"
+    Properties:
+      Enabled: true
+      EventSourceArn:
+        Fn::ImportValue:
+          !Sub "${FeaturePrefix}-dynamodb-stream-arn"
+      FunctionName:
+        Fn::GetAtt:
+          - "DynamoEventsToFirehoseLambda"
+          - "Arn"
+      StartingPosition: "TRIM_HORIZON"

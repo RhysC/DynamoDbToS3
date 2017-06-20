@@ -1,0 +1,46 @@
+---
+Description: 'AWS CloudFormation Sample Template: This template demonstrates the creation
+  of a DynamoDB table.'
+Parameters:
+  FeaturePrefix:
+      Description: "The name to be used to prefix resources"
+      Type: String
+      Default: rhystest  # lower case alpha numeric and hyphens? TODO AllowedPattern
+
+Resources:
+  DynamoDBTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Join
+          - ""
+          -
+            - Ref: FeaturePrefix
+            - "-dynamodb-table"
+      AttributeDefinitions:
+      - AttributeName: 'id'
+        AttributeType: 'S'
+      - AttributeName: 'timestamp'
+        AttributeType: 'N'
+      KeySchema:
+      - AttributeName: 'id'
+        KeyType: 'HASH'
+      - AttributeName: 'timestamp'
+        KeyType: 'RANGE'
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+      StreamSpecification:
+        StreamViewType: 'NEW_IMAGE'
+
+Outputs:
+  TableName:
+    Description: Table name of the newly create DynamoDB table
+    Value:
+      Ref: DynamoDBTable
+    Export:
+      Name: !Sub "${FeaturePrefix}-dynamodb-table"
+  TableStreamArn:
+    Description: Table Stream arn of the newly create DynamoDB table
+    Value: !GetAtt DynamoDBTable.StreamArn
+    Export:
+      Name: !Sub "${FeaturePrefix}-dynamodb-stream-arn"
